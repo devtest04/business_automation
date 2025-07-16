@@ -1,0 +1,67 @@
+import pandas as pd
+import os
+from datetime import datetime
+
+folder_path = "employee_data"
+master_file = "master_report.xlsx"
+today = datetime.today().strftime("%Y-%m-%d")
+
+daily_rows = []
+total_self = total_cash = total_onl = total_tran = 0
+
+for file in os.listdir(folder_path):
+    if file.endswith(".xlsx") and not file.startswith("~$"):
+        path = os.path.join(folder_path, file)
+        df = pd.read_excel(path)
+
+        df = df[~df['WORK'].astype(str).str.upper().isin(['TOTAL', 'OVERALL'])]
+
+        s = df['SELF'].sum()
+        c = df['CASH'].sum()
+        o = df['ONL'].sum()
+        t = df['TRAN'].sum()
+
+        daily_rows.append({
+            'DATE': today,
+            'EMPLOYEE': file.replace('.xlsx', ''),
+            'SELF': s,
+            'CASH': c,
+            'ONL': o,
+            'TRAN': t
+        })
+
+        total_self += s
+        total_cash += c
+        total_onl += o
+        total_tran += t
+
+# ✅ Add only TOTAL row
+daily_rows.append({
+    'DATE': None,
+    'EMPLOYEE': 'TOTAL',
+    'SELF': total_self,
+    'CASH': total_cash,
+    'ONL': total_onl,
+    'TRAN': total_tran
+})
+
+# ✅ Create DataFrame
+df_today = pd.DataFrame(daily_rows)
+
+# ❌ Keep only first row's DATE
+df_today.loc[1:, 'DATE'] = None
+
+# ✅ 2 blank rows
+blank_df = pd.DataFrame([{col: None for col in df_today.columns}] * 2)
+df_today = pd.concat([df_today, blank_df], ignore_index=True)
+
+# ✅ Merge and save
+if os.path.exists(master_file):
+    existing_df = pd.read_excel(master_file)
+    final_df = pd.concat([existing_df, df_today], ignore_index=True)
+else:
+    final_df = df_today
+
+final_df.to_excel(master_file, index=False)
+
+print("✅ DONE: Daily report with TOTAL (no GRAND) + spacing saved.")
